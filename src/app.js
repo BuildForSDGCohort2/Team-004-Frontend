@@ -8,7 +8,6 @@ import $ from "jquery";
 
 import AppConfig from "./config";
 
-import SplashView from "./views/Splash";
 import LoginView from "./views/Login";
 import VideosView from "./views/Videos";
 import AddVideoView from "./views/videos/Add";
@@ -65,12 +64,11 @@ ReactDom.render(
     (
         <Router history={hashHistory}>
             <Route path="/" component={App}>
-                <IndexRoute component={SplashView}/>
-                <Route path="splash" component={SplashView}/>
+                <IndexRoute component={VideosView}/>
                 <Route path="login" component={LoginView}/>
                 <Route path="videos" component={VideosView}/>
                 <Route path="add-video" component={AddVideoView}/>
-                <Route path="/videos/:videoId" component={ViewVideoView}/>
+                <Route path="/videos/:videoId/:videoTitle" component={ViewVideoView}/>
             </Route>
         </Router>
     ), document.getElementById("app")

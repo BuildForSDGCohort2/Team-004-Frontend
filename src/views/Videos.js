@@ -18,14 +18,14 @@ import CircularProgress from "@material-ui/core/CircularProgress";
 import Fab from "@material-ui/core/Fab";
 import Snackbar from "@material-ui/core/Snackbar";
 import Infinite from "react-infinite";
+import ArrowBackIcon from "@material-ui/core/SvgIcon/SvgIcon";
+import IconButton from "@material-ui/core/IconButton";
+import Button from "@material-ui/core/Button";
 
 import $ from "jquery";
 import moment from "moment";
 
 import AppConfig from "../config";
-import ArrowBackIcon from "@material-ui/core/SvgIcon/SvgIcon";
-import IconButton from "@material-ui/core/IconButton";
-import Button from "@material-ui/core/Button";
 
 var VideosView, AppEnv, ListElement;
 AppEnv = AppConfig.get(AppConfig.get("environment"));
@@ -37,48 +37,104 @@ ListElement = createReactClass({
 		view = this;
 
 		state = {
+			isExpired: null,
 		};
 
 		return state;
 	},
 
-	getInsights(video){
+    componentWillMount(){
+        var view;
+        view = this;
+        view.getThumbnail(view.props.video);
+    },
+
+    getInsights(video){
 		var view, insights;
 
 		view = this;
 		insights = [];
-		insights.push(video.views + " views");
+		//insights.push(video.views + " views");
 		//insights.push(video.comments + " comments");
-		insights.push(video.downloads + " downloads");
-		insights.push(moment(video.createDate).fromNow());
+		//insights.push(video.downloads + " downloads");
+		insights.push(moment(video.createdAt).fromNow());
 
 		return insights.join(" - ");
 	},
+
+    getThumbnail(video){
+        var view, urlParams, request;
+
+        view = this;
+
+        urlParams = {
+        };
+        if(window.localStorage.getItem(AppEnv.namespace+"_user_token") !== null){
+            urlParams.token = window.localStorage.getItem(AppEnv.namespace+"_user_token");
+        }
+
+        request = $.ajax({
+            url: AppEnv.backendUrl + "/courses/" + video._id + "/thumbnail",
+            cache: false,
+            data: urlParams,
+            mimeType: "text/plain; charset=x-user-defined",
+            error(xhr, status, error) {
+                if(xhr.status === 200){
+                    view.setState({
+                        isExpired: false
+                    });
+                }else{
+                    view.setState({
+                        isExpired: true
+                    });
+                }
+            },
+            headers: {
+            },
+            method: "GET",
+            success(data, status, xhr) {
+                view.setState({
+                    isExpired: false
+                });
+            }
+        });
+
+        view.props.parentView.ajaxRequests.push(request);
+    },
 
     viewVideo(e, video){
         var view;
 
         view = this;
 
-        window.sessionStorage.setItem(AppEnv.namespace+"_player_video", JSON.stringify(video));
-        view.props.parentView.props.router.push("/videos/"+video.id);
+        view.props.parentView.props.router.push("/videos/"+video._id+"/"+encodeURIComponent(video.title));
 	},
 
     render() {
 		return (
-			<ListItem onClick={(e) => this.viewVideo(e, this.props.video)}>
-				<Card style={{width:"100%"}}>
-					<CardMedia
-						image={this.props.video.thumbnail}
-						title={this.props.video.title}
-                        style={{height:"320px"}}
-					/>
-					<CardContent>
-						<Typography component="h2">{this.props.video.title}</Typography>
-						<Typography component="h2" variant="subtitle2">By {this.props.video.teacher.name}</Typography>
-						<Typography  component="p" variant="body2" color="textSecondary">{this.getInsights(this.props.video)}</Typography>
-					</CardContent>
-				</Card>
+			<ListItem>
+				{this.state.isExpired===false &&
+                    <Card style={{width: "100%", cursor: "pointer"}} onClick={(e) => this.viewVideo(e, this.props.video)}>
+                        <CardMedia
+                            image={AppEnv.backendUrl + "/courses/" + this.props.video._id + "/thumbnail"}
+                            title={this.props.video.title}
+                            style={{height:"320px"}}
+                        />
+                        <CardContent>
+                            <Typography component="h2">{this.props.video.title}</Typography>
+                            <Typography  component="p" variant="body2" color="textSecondary">{this.getInsights(this.props.video)}</Typography>
+                        </CardContent>
+                    </Card>
+                }
+                {this.state.isExpired===true &&
+                    <Card style={{width:"100%"}}>
+                        <CardContent>
+                            <Typography component="h2">{this.props.video.title}</Typography>
+                            <Typography  component="p" variant="body2" color="textSecondary">{this.getInsights(this.props.video)}</Typography>
+                            <Typography  component="p" variant="body2" color="textSecondary">Content no longer available. Uploads are <a href="https://help.heroku.com/K1PPS2WM/why-are-my-file-uploads-missing-deleted" target="_blank"> deleted periodically</a> on Heroku. With a <a href="#/login">Teacher account</a> you can add more videos.</Typography>
+                        </CardContent>
+                    </Card>
+                }
 			</ListItem>
         );
 	}
@@ -100,10 +156,13 @@ VideosView = createReactClass({
 		    isTeacher: window.localStorage.getItem(AppEnv.namespace+"_user_role") === "teacher",
             list: {
                 isLoading: false,
-                infiniteLoadBeginEdgeOffset: 200,
-                nextUrl: null,
+                infiniteLoadBeginEdgeOffset: 180,
+                query: "",
+                limit: 4,
+                skip: 0,
                 items: [],
                 elements: [],
+				hasNext: true
             },
             feedback: {
 				open: false,
@@ -144,72 +203,105 @@ VideosView = createReactClass({
 		});
     },
 
-    loadVideos(e){
-        var View, listState;
+    handleQueryChange (e){
+        var View, value, listState;
+
+        View = this;
+        listState = View.state.list;
+		
+		listState = {
+			isLoading: false,
+			infiniteLoadBeginEdgeOffset: 180,
+			query: e.nativeEvent.target.value,
+			limit: 4,
+			skip: 0,
+			items: [],
+			elements: [],
+			hasNext: true
+		};
+
+        View.setState({
+			list: listState
+		});
+    },
+
+    loadVideos(e, query){
+        var View, listState, urlParams, request;
 
         View = this;
         listState = this.state.list;
 
-        listState.isLoading = true;
-        this.setState({
-            list: listState
-        });
+		if(listState.hasNext){
+			listState.isLoading = true;
+			this.setState({
+				list: listState
+			});
 
-        //should be ajax request
-        setTimeout(function(){
-            var items, i;
+			urlParams = {
+				limit: listState.limit
+			};
+			if(window.localStorage.getItem(AppEnv.namespace+"_user_token") !== null){
+				urlParams.token = window.localStorage.getItem(AppEnv.namespace+"_user_token");
+			}
+			if(listState.skip !== 0){
+				urlParams.skip = listState.skip;
+			}
+			if(listState.query.length !== 0){
+				urlParams.query = listState.query;
+			}
 
-            items = [
-                {
-                    id: listState.items.length+1,
-                    title: "Repeated Addition",
-                    subject: "Mathematics",
-                    level: "Grade 2",
-                    country: "ZA",
-                    description: "This video is part of the Bambanani series which is aimed at illustrating how teachers are teaching inclusively in South African classrooms. It focusses on teaching the topic of Repeated Addition (Mathematics) in Grade 2.",
-                    language: "en",
-                    createDate: "2019-03-14",
-                    views: 235,
-                    downloads: 30,
-                    //comments: 10,
-                    teacher: {
-                        name: "Bambanani"
-                    },
-                    thumbnail: "https://www.dw.com/image/17517158_303.jpg",
-                    url: "https://www.youtube.com/watch?v=xXJer2AD5Xk"
-                },
-                {
-                    id: listState.items.length+2,
-                    title: "Repeated Addition",
-                    subject: "Mathematics",
-                    level: "Grade 2",
-                    country: "ZA",
-                    description: "This video is part of the Bambanani series which is aimed at illustrating how teachers are teaching inclusively in South African classrooms. It focusses on teaching the topic of Repeated Addition (Mathematics) in Grade 2.",
-                    language: "en",
-                    createDate: "2019-03-14",
-                    views: 235,
-                    downloads: 30,
-                    //comments: 10,
-                    teacher: {
-                        name: "Bambanani"
-                    },
-                    thumbnail: "https://i.ytimg.com/vi/5ya2ip1-mfc/maxresdefault.jpg",
-                    url: "https://www.youtube.com/watch?v=xXJer2AD5Xk"
-                }
-            ];
+			request = $.ajax({
+				url: AppEnv.backendUrl + "/courses",
+				cache: false,
+				data: urlParams,
+				contentType: "application/json",
+				dataType: "json",
+				error(xhr, status, error) {
+					var response;
+					if("responseText" in xhr) {
+						response = JSON.parse(xhr.responseText);
+					}else if("statusText" in xhr){
+						response = xhr.statusText;
+					}else{
+						response = error;
+					}
 
-            listState.isLoading = false;
+					listState.isLoading = false;
 
-            listState.items.concat(items);
+					View.setState({
+						list: listState,
+						feedback: {
+							open: true,
+							message: response.message
+						}
+					});
+				},
+				headers: {
+				},
+				method: "GET",
+				success(data, status, xhr) {
+					var i;
 
-            for (i = 0; i < items.length; i++) {
-                listState.elements.push(<ListElement key={items[parseInt(i)].id} video={items[parseInt(i)]} parentView={View}/>);
-            }
+					for (i = 0; i < data.length; i++) {
+						listState.elements.push(<ListElement key={data[parseInt(i)]._id} video={data[parseInt(i)]} parentView={View}/>);
+					}
 
-            View.setState({
-                list: listState
-            });
-        }, 3000);
+					listState.isLoading = false;
+
+					listState.items = listState.items.concat(data);
+
+					listState.skip = listState.items.length;
+					
+					listState.hasNext = (data.length!==0);
+					
+					View.setState({
+						list: listState
+					});
+				}
+			});
+
+			View.ajaxRequests.push(request);
+		}
     },
 
     addVideo(e){
@@ -238,17 +330,21 @@ VideosView = createReactClass({
                 <AppBar position="static">
                     <Toolbar>
                         <Typography variant="h6" style={{ flexGrow: 1 }}>AfriTeach</Typography>
-                        <div style={{ position: "relative", backgroundColor: "rgba(255, 255, 255, 0.15)" }}>
-                            <div style={{ height: "100%", position: "absolute", pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                                <SearchIcon />
-                            </div>
+                        <div style={{ position: "relative", backgroundColor: "rgba(255, 255, 255, 0.15)", margin: "0 8px 0 16px", paddingRight: "32px" }}>
                             <InputBase
-                                style={{ width: "100%", color: "inherit", paddingLeft: "32px" }}
+                                onChange={(e) => this.handleQueryChange(e)}
+								style={{ width: "100%", color: "inherit", padding: "6px 6px 7px" }}
                                 placeholder="Search..."
                             />
+							<IconButton
+								style={{ height: "100%", position: "absolute", top: "0", right: "0", pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center"}}
+								color="inherit" 
+								onClick={(e) => this.loadVideos(e, this.state.list.query)}
+							>
+								<SearchIcon />
+							</IconButton>
                         </div>
-                        {!this.state.isConnected &&
+						{!this.state.isConnected &&
                             <Button color="inherit" href="#/login">Login</Button>
                         }
                         {this.state.isConnected &&
@@ -259,14 +355,16 @@ VideosView = createReactClass({
 				<Grid item xs={12}>
                     <List>
                         <Infinite
-                            elementHeight={441+72}
+                            elementHeight={180}
                             useWindowAsScrollContainer={true}
                             infiniteLoadBeginEdgeOffset={this.state.list.infiniteLoadBeginEdgeOffset}
                             onInfiniteLoad={(e) => this.loadVideos(e)}
                             loadingSpinnerDelegate={
-                                <CircularProgress
-                                    size={0.5}
-                                />
+                                this.state.list.isLoading && <div style={{ textAlign: "center" }}>
+									<CircularProgress
+										size="32px"
+									/>
+								</div>
                             }
                             isInfiniteLoading={this.state.list.isLoading}
                         >
