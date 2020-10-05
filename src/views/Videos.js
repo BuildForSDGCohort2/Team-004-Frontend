@@ -37,7 +37,7 @@ ListElement = createReactClass({
 		view = this;
 
 		state = {
-		    isExpired: null,
+			isExpired: null,
 		};
 
 		return state;
@@ -95,7 +95,7 @@ ListElement = createReactClass({
             success(data, status, xhr) {
                 view.setState({
                     isExpired: false
-                })
+                });
             }
         });
 
@@ -301,8 +301,6 @@ VideosView = createReactClass({
 			});
 
 			View.ajaxRequests.push(request);
-		}else{
-			
 		}
     },
 

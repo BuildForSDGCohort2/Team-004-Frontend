@@ -121,8 +121,6 @@ ViewVideoView = createReactClass({
 					response = error;
 				}
 
-				listState.isLoading = false;
-
 				View.setState({
 					isLoading: false,
 					feedback: {
