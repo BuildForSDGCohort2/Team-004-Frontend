@@ -11,6 +11,7 @@ import TextField from "@material-ui/core/TextField/TextField";
 import Select from "@material-ui/core/Select";
 import MenuItem from "@material-ui/core/MenuItem";
 import Button from "@material-ui/core/Button";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 import $ from "jquery";
 
@@ -56,10 +57,12 @@ LoginView = createReactClass({
 			},
 			role: "student",
 			registerButton: {
-				isActive: false
+				isActive: false,
+				isLoading: false
 			},
 			loginButton: {
-				isActive: false
+				isActive: false,
+				isLoading: false
 			},
 			feedback: {
 				open: false,
@@ -341,16 +344,16 @@ LoginView = createReactClass({
 	},
 
 	register(e){
-		var View, request;
+		var View, request, buttonState;
 
 		View = this;
+		buttonState = View.state.registerButton;
 
 		if(View.state.registerButton.isActive){
+			buttonState.isLoading = true;
+			
 			View.setState({
-				feedback: {
-					open: true,
-					message: "Processing..."
-				}
+				registerButton: buttonState
 			});
 
 			request = $.ajax({
@@ -373,7 +376,11 @@ LoginView = createReactClass({
                     }else{
                         response = error;
                     }
-                    View.setState({
+					
+                    buttonState.isLoading = false;
+					
+					View.setState({
+						loginButton: buttonState,
                         feedback: {
                             open: true,
                             message: response.message
@@ -398,16 +405,16 @@ LoginView = createReactClass({
 	},
 
 	login(e){
-		var View, request;
+		var View, request, buttonState;
 
 		View = this;
+		buttonState = View.state.loginButton;
 
 		if(View.state.loginButton.isActive){
+			buttonState.isLoading = true;
+			
 			View.setState({
-				feedback: {
-					open: true,
-					message: "Processing..."
-				}
+				loginButton: buttonState
 			});
 
 			request = $.ajax({
@@ -428,7 +435,11 @@ LoginView = createReactClass({
                     }else{
                         response = error;
                     }
+					
+					buttonState.isLoading = false;
+					
                     View.setState({
+						loginButton: buttonState,
                         feedback: {
                             open: true,
                             message: response.message
@@ -534,6 +545,13 @@ LoginView = createReactClass({
 									Sign Up
 								</Button>
 							</div>
+							{
+								this.state.registerButton.isLoading && <div style={{ textAlign: "center" }}>
+									<CircularProgress
+										size="32px"
+									/>
+								</div>
+							}
 						</div>
 					</div>
 					<div
@@ -576,6 +594,13 @@ LoginView = createReactClass({
 									Sign Up
 								</Button>
 							</div>
+							{
+								this.state.loginButton.isLoading && <div style={{ textAlign: "center" }}>
+									<CircularProgress
+										size="32px"
+									/>
+								</div>
+							}
 						</div>
 					</div>
 				</Grid>

@@ -34,7 +34,10 @@ ViewVideoView = createReactClass({
 		cachedState = JSON.parse(window.sessionStorage.getItem(AppEnv.namespace+"_view_video_view_state"));
 			
 		state = {
-            video: JSON.parse(window.sessionStorage.getItem(AppEnv.namespace+"_player_video")),
+            videoId: this.props.params.videoId,
+            videoTitle: decodeURIComponent(this.props.params.videoTitle),
+			video: null,
+			isLoading: false,
             feedback: {
 				open: false,
 				message: ""
@@ -48,9 +51,11 @@ ViewVideoView = createReactClass({
         var View;
 		View = this;
 
-        if(View.state.video === null){
+        if(View.state.videoId.length === 0){
             View.props.router.push("/");
         }
+		
+		View.load();
     },
 
     componentDidMount(){
@@ -85,12 +90,59 @@ ViewVideoView = createReactClass({
         View.props.router.goBack();
     },
 
-    download(e){
-        var View;
+    load(){
+        var View, urlParams, request;
 
         View = this;
 
-        //download video
+        urlParams = {
+        };
+        if(window.localStorage.getItem(AppEnv.namespace+"_user_token") !== null){
+            urlParams.token = window.localStorage.getItem(AppEnv.namespace+"_user_token");
+        }
+
+		View.setState({
+			isLoading: true
+		});
+		
+        request = $.ajax({
+            url: AppEnv.backendUrl + "/courses/" + View.state.videoId,
+            cache: false,
+            data: urlParams,
+            contentType: "application/json",
+			dataType: "json",
+			error(xhr, status, error) {
+				var response;
+				if("responseText" in xhr) {
+					response = JSON.parse(xhr.responseText);
+				}else if("statusText" in xhr){
+					response = xhr.statusText;
+				}else{
+					response = error;
+				}
+
+				listState.isLoading = false;
+
+				View.setState({
+					isLoading: false,
+					feedback: {
+						open: true,
+						message: response.message
+					}
+				});
+			},
+            headers: {
+            },
+            method: "GET",
+            success(data, status, xhr) {
+                View.setState({
+					isLoading: false,
+					video: data
+				});
+            }
+        });
+
+        View.ajaxRequests.push(request);
     },
 
     render(){
@@ -101,29 +153,40 @@ ViewVideoView = createReactClass({
                         <IconButton color="inherit" onClick={(e) => this.back(e)} >
                             <ArrowBackIcon/>
                         </IconButton>
-                        <Typography variant="h6" style={{ flexGrow: 1 }}>{this.state.video.title}</Typography>
+                        <Typography variant="h6" style={{ flexGrow: 1 }}>{this.state.videoTitle}</Typography>
                     </Toolbar>
                 </AppBar>
                 <Grid item xs={12}>
-                    <div className="player-wrapper">
-                        <ReactPlayer
-                            className="react-player"
-                            url={this.state.video.url}
-                            width="100%"
-                            height="100%"
-                        />
-                    </div>
-                    <Paper elevation={1} style={{ padding: "8px 16px"}}>
-                        <Typography component="h2">{this.state.video.title}</Typography>
-                        <Typography component="h2" variant="subtitle2">By {this.state.video.teacher.name}</Typography>
-                        <Typography  component="p" variant="body2" color="textSecondary">{[this.state.video.views + " views", this.state.video.downloads + " downloads", moment(this.state.video.createDate).fromNow()].join(" - ")}</Typography>
+					{this.state.video !== null &&
+						<div>
+							<div className="player-wrapper">
+								<ReactPlayer
+									className="react-player"
+									url={AppEnv.backendUrl + "/courses/" + this.state.videoId + "/stream"}
+									width="100%"
+									height="100%"
+									controls={true}
+								/>
+							</div>
+							<Paper elevation={1} style={{ padding: "8px 16px"}}>
+								<Typography component="h2">{this.state.video.title}</Typography>
+								<Typography  component="p" variant="caption" color="textSecondary">{[moment(this.state.video.createdAt).fromNow()].join(" - ")}</Typography>
+								<Typography  component="p" variant="body2" color="textSecondary">{this.state.video.description}</Typography>
+								
+								<Divider style={{ margin:"15px 0" }}/>
 
-                        <Divider style={{ margin:"15px 0" }}/>
-
-                        <Typography variant="overline" display="block" gutterBottom><strong>Country</strong> {this.state.video.country} - <strong>Language</strong> {this.state.video.language} - <strong>Level</strong> {this.state.video.level} - <strong>Subject</strong> {this.state.video.subject}</Typography>
-                        <Typography  component="p" variant="body2" color="textSecondary">{this.state.video.description}</Typography>
-                        <Button color="primary" startIcon={<CloudDownloadIcon />} onClick={(e) => this.download(e)}>Download Video</Button>
-                    </Paper>
+								<Typography variant="overline" display="block" gutterBottom><strong>Country</strong> {this.state.video.country} - <strong>Language</strong> {this.state.video.language} - <strong>Level</strong> {this.state.video.level} - <strong>Subject</strong> {this.state.video.subject}</Typography>
+								<Button color="primary" startIcon={<CloudDownloadIcon />} href={AppEnv.backendUrl + "/courses/" + this.state.videoId + "/download"}>Download Video</Button>
+							</Paper>
+						</div>
+					}
+					{
+						this.state.isLoading && <div style={{ textAlign: "center" }}>
+								<CircularProgress
+									size="32px"
+								/>
+							</div>
+					}
                 </Grid>
                 <Snackbar
                     anchorOrigin={{ vertical: "bottom", horizontal: "center" }}

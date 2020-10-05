@@ -395,7 +395,7 @@ AddVideoView = createReactClass({
                 },
                 method: "POST",
                 success(data, status, xhr){
-                    View.props.router.push("/videos/" + data._id);
+                    View.props.router.push("/videos/" + data._id+"/"+encodeURIComponent(View.state.title.value));
                 }
             });
 
