@@ -5,8 +5,8 @@ AppConfig.set({
     environment: "develop",
     develop: {
         namespace: "afriteach_develop",
-		frontendUrl: "",
-		backendUrl: "https://africateach.herokuapp.com"
+	frontendUrl: "https://afriteachweb.herokuapp.com/",
+	backendUrl: "https://afriteach.azurewebsites.net/"
     }
 });
 
